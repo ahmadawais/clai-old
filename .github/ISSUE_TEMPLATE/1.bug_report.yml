@@ -8,6 +8,7 @@ body:
           value: |
                Use this template to report bugs for Command Code. Feel free to [start a new thread in our discord forum](https://commandcode.ai/discord).
     - type: textarea
+      id: summary
       attributes:
           label: Summary
           description: Briefly describe the issue and how it affects your workflow.
@@ -15,6 +16,7 @@ body:
       validations:
           required: true
     - type: textarea
+      id: expected-behavior
       attributes:
           label: Expected Behavior
           description: Describe the expected behavior you were expecting.
@@ -22,6 +24,7 @@ body:
       validations:
           required: true
     - type: textarea
+      id: actual-behavior
       attributes:
           label: Actual Behavior
           description: Describe the actual behavior that occurred.
@@ -29,6 +32,7 @@ body:
       validations:
           required: true
     - type: textarea
+      id: steps-to-reproduce
       attributes:
           label: Steps to reproduce the issue
           description: Describe the actual steps to reproduce the issue.
@@ -70,6 +74,7 @@ body:
           description: Which shell are you using?
           placeholder: zsh
     - type: textarea
+      id: additional-context
       attributes:
           label: Additional context
           description: |
