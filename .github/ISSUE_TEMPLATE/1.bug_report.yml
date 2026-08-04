@@ -6,7 +6,7 @@ body:
     - type: markdown
       attributes:
           value: |
-               Use this template to report bugs for Command Code. Feel free to [start a new thread in our discord forum](https://commandcode.ai/discord).
+              Use this template to report bugs for Command Code. Feel free to [start a new thread in our discord forum](https://commandcode.ai/discord).
     - type: textarea
       id: summary
       attributes:
@@ -73,6 +73,18 @@ body:
           label: Shell
           description: Which shell are you using?
           placeholder: zsh
+    - type: textarea
+      id: session-file
+      attributes:
+          label: Session file (optional)
+          description: Run `/export jsonl` and drop the file here. Redact secrets first — it holds the whole session.
+          placeholder: Drag the .jsonl here...
+    - type: textarea
+      id: fix-prompt
+      attributes:
+          label: Fix prompt (optional)
+          description: How would you prompt a coding agent to fix this? Where it lives, what's correct, how to check.
+          placeholder: "Prompt to help Command Code fix and improve itself …"
     - type: textarea
       id: additional-context
       attributes:
