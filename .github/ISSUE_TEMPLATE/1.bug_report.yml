@@ -59,6 +59,7 @@ body:
               - macOS
               - Linux
               - Windows
+              - Other  
       validations:
           required: true
     - type: input
