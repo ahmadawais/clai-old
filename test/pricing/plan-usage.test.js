@@ -12,31 +12,40 @@ const USAGE = {
   outputTokens: 200_000,
 };
 
-test('goat and pro consume identical allowance at peak and off-peak', () => {
+test('goat and pro allowances deduct at the dynamic rate: peak burns 2x', () => {
   for (const plan of ['goat', 'pro']) {
     const offPeak = meterUsage({ plan, model: 'deepseek-v4-flash', usage: USAGE, at: utc(12) });
     const peak = meterUsage({ plan, model: 'deepseek-v4-flash', usage: USAGE, at: utc(7) });
 
     assert.equal(offPeak.tier, PricingTier.OFF_PEAK);
     assert.equal(peak.tier, PricingTier.PEAK);
-    // Same usage deduction regardless of time of day.
-    assert.equal(peak.planUsageUsd, offPeak.planUsageUsd);
-    // Plan users are never billed extra for peak.
+    // Peak premium is passed through: the same request costs double allowance.
+    assert.equal(peak.planUsageUsd, offPeak.planUsageUsd * 2);
+    // Allowance plans are never billed directly.
     assert.equal(peak.billedUsd, 0);
     assert.equal(offPeak.billedUsd, 0);
   }
 });
 
-test('peak surcharge is absorbed and equals the provider premium', () => {
-  const peak = meterUsage({ plan: 'goat', model: 'deepseek-v4-pro', usage: USAGE, at: utc(2) });
-  assert.equal(peak.providerCostUsd, peak.planUsageUsd * 2);
-  assert.equal(peak.peakSurchargeUsd, peak.providerCostUsd - peak.planUsageUsd);
+test('goat and pro are treated identically', () => {
+  const goat = meterUsage({ plan: 'goat', model: 'deepseek-v4-pro', usage: USAGE, at: utc(2) });
+  const pro = meterUsage({ plan: 'pro', model: 'deepseek-v4-pro', usage: USAGE, at: utc(2) });
+  assert.deepEqual({ ...goat, plan: null }, { ...pro, plan: null });
 });
 
-test('no surcharge is recorded off-peak', () => {
+test('nothing is absorbed: allowance deduction always covers provider cost', () => {
+  for (const at of [utc(2), utc(7), utc(12), utc(23)]) {
+    const result = meterUsage({ plan: 'goat', model: 'deepseek-v4-pro', usage: USAGE, at });
+    assert.equal(result.planUsageUsd, result.providerCostUsd);
+  }
+});
+
+test('peak premium is reported as the peak-attributable portion of the charge', () => {
+  const peak = meterUsage({ plan: 'pro', model: 'deepseek-v4-pro', usage: USAGE, at: utc(2) });
+  assert.equal(peak.peakPremiumUsd, peak.providerCostUsd / 2);
+
   const offPeak = meterUsage({ plan: 'pro', model: 'deepseek-v4-pro', usage: USAGE, at: utc(14) });
-  assert.equal(offPeak.peakSurchargeUsd, 0);
-  assert.equal(offPeak.providerCostUsd, offPeak.planUsageUsd);
+  assert.equal(offPeak.peakPremiumUsd, 0);
 });
 
 test('pay-as-you-go pays the dynamic peak price directly', () => {
@@ -46,15 +55,14 @@ test('pay-as-you-go pays the dynamic peak price directly', () => {
   assert.equal(peak.billedUsd, peak.providerCostUsd);
   assert.equal(peak.billedUsd, offPeak.billedUsd * 2);
   assert.equal(peak.planUsageUsd, 0);
-  assert.equal(peak.peakSurchargeUsd, 0);
 });
 
 test('plan metering before the cutover uses the legacy flat rates', () => {
   const at = new Date(Date.UTC(2026, 7, 16, 2)); // pre-cutover, inside future peak window
   const result = meterUsage({ plan: 'goat', model: 'deepseek-v4-flash', usage: USAGE, at });
   assert.equal(result.tier, PricingTier.FLAT);
-  assert.equal(result.peakSurchargeUsd, 0);
-  assert.equal(result.providerCostUsd, result.planUsageUsd);
+  assert.equal(result.peakPremiumUsd, 0);
+  assert.equal(result.planUsageUsd, result.providerCostUsd);
 });
 
 test('unknown plans throw', () => {
@@ -64,8 +72,8 @@ test('unknown plans throw', () => {
   );
 });
 
-test('plan registry flags who absorbs the surcharge', () => {
-  assert.equal(PLANS.goat.absorbsPeakSurcharge, true);
-  assert.equal(PLANS.pro.absorbsPeakSurcharge, true);
-  assert.equal(PLANS.payg.absorbsPeakSurcharge, false);
+test('plan registry declares billing modes', () => {
+  assert.equal(PLANS.goat.billing, 'allowance');
+  assert.equal(PLANS.pro.billing, 'allowance');
+  assert.equal(PLANS.payg.billing, 'direct');
 });

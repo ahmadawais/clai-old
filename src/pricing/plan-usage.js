@@ -1,21 +1,21 @@
 /**
  * Plan-aware metering for DeepSeek charges under the peak/off-peak schedule.
  *
- * Product requirement: provider charges are priced dynamically during peak
- * hours, but Goat and Pro subscribers keep the same usage allowance around
- * the clock. We achieve that by always metering plan allowances at the
- * time-of-day-independent base (off-peak) rates; the peak premium is
- * absorbed by us and tracked separately as `peakSurchargeUsd` for internal
- * cost accounting. Pay-as-you-go usage is billed at the dynamic rate in
- * force when the request runs.
+ * Product requirement: the peak premium is passed through to customers, not
+ * absorbed by us. Goat and Pro are treated identically: plan allowances are
+ * metered at the dynamic rate in force when the request runs, so the same
+ * request consumes twice the allowance during peak hours (peak = 2x
+ * off-peak). Pay-as-you-go usage is billed directly at the same dynamic
+ * rate. `peakPremiumUsd` reports the portion of the charge attributable to
+ * peak pricing, for receipts and usage breakdowns.
  */
 
 import { calculateCharge, costUsd, getBaseRates, roundUsd } from './deepseek.js';
 
 export const PLANS = Object.freeze({
-  goat: Object.freeze({ id: 'goat', name: 'Goat', absorbsPeakSurcharge: true }),
-  pro: Object.freeze({ id: 'pro', name: 'Pro', absorbsPeakSurcharge: true }),
-  payg: Object.freeze({ id: 'payg', name: 'Pay as you go', absorbsPeakSurcharge: false }),
+  goat: Object.freeze({ id: 'goat', name: 'Goat', billing: 'allowance' }),
+  pro: Object.freeze({ id: 'pro', name: 'Pro', billing: 'allowance' }),
+  payg: Object.freeze({ id: 'payg', name: 'Pay as you go', billing: 'direct' }),
 });
 
 /**
@@ -24,11 +24,11 @@ export const PLANS = Object.freeze({
  * @param {{ plan: string, model: string, usage: object, at: Date | number | string }} params
  * @returns {{
  *   plan: string,
- *   tier: string,                    // pricing tier in force when the request ran
- *   providerCostUsd: number,         // what DeepSeek charges us (dynamic)
- *   planUsageUsd: number,            // what we deduct from the user's allowance
- *   billedUsd: number,               // what the user pays on top of the plan (PAYG only)
- *   peakSurchargeUsd: number,        // peak premium we absorb for plan users
+ *   tier: string,            // pricing tier in force when the request ran
+ *   providerCostUsd: number, // what DeepSeek charges us (dynamic)
+ *   planUsageUsd: number,    // deducted from the plan allowance (dynamic; 0 for direct billing)
+ *   billedUsd: number,       // charged directly to the customer (0 for allowance plans)
+ *   peakPremiumUsd: number,  // portion of the charge attributable to peak pricing
  * }}
  */
 export function meterUsage({ plan, model, usage, at }) {
@@ -39,25 +39,14 @@ export function meterUsage({ plan, model, usage, at }) {
 
   const provider = calculateCharge(model, usage, at);
   const base = getBaseRates(model, at);
-  const baseCostUsd = costUsd(usage, base.rates);
-
-  if (planDef.absorbsPeakSurcharge) {
-    return {
-      plan: planDef.id,
-      tier: provider.tier,
-      providerCostUsd: provider.costUsd,
-      planUsageUsd: baseCostUsd,
-      billedUsd: 0,
-      peakSurchargeUsd: roundUsd(provider.costUsd - baseCostUsd),
-    };
-  }
+  const peakPremiumUsd = roundUsd(provider.costUsd - costUsd(usage, base.rates));
 
   return {
     plan: planDef.id,
     tier: provider.tier,
     providerCostUsd: provider.costUsd,
-    planUsageUsd: 0,
-    billedUsd: provider.costUsd,
-    peakSurchargeUsd: 0,
+    planUsageUsd: planDef.billing === 'allowance' ? provider.costUsd : 0,
+    billedUsd: planDef.billing === 'direct' ? provider.costUsd : 0,
+    peakPremiumUsd,
   };
 }

@@ -27,13 +27,13 @@ aliases of `deepseek-v4-flash`.
 
 ## How Command Code plans handle it
 
-Provider charges are computed dynamically (`src/pricing/deepseek.js`), but
-**Goat and Pro subscribers keep the same usage allowance at all hours**:
+Provider charges are computed dynamically (`src/pricing/deepseek.js`) and the
+**peak premium is passed through to customers — we absorb nothing**:
 
-- Plan allowances are metered at the time-independent base (off-peak) rates
-  via `getBaseRates()`, so a request consumes the same allowance at 07:00 UTC
-  as at 15:00 UTC.
-- The peak premium is absorbed by us and surfaced as `peakSurchargeUsd` in
-  `meterUsage()` (`src/pricing/plan-usage.js`) for internal cost accounting.
-- Pay-as-you-go usage is billed at the dynamic rate in force when the
-  request runs.
+- Goat and Pro are treated identically: plan allowances are metered at the
+  dynamic rate in force when the request runs, so the same request consumes
+  2x the allowance during peak hours.
+- Pay-as-you-go usage is billed directly at the same dynamic rate.
+- `peakPremiumUsd` in `meterUsage()` (`src/pricing/plan-usage.js`) reports
+  the portion of each charge attributable to peak pricing, for receipts and
+  usage breakdowns.
