@@ -1,0 +1,10 @@
+{
+  "name": "command-code",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Command Code — the coding agent that learns your coding taste.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
